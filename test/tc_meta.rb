@@ -4,6 +4,7 @@ require 'bud/viz_util.rb'
 require 'bud/depanalysis'
 require 'bud/meta_algebra'
 
+
 include VizUtil
 
 class LocalShortestPaths
@@ -145,6 +146,62 @@ class InterfaceAlternate
     table :stor
     interfaces :input, [:inc, :stor]
     interfaces :output, [:outc]
+  end
+end
+
+module LHelper
+  state do
+    scratch :rlin, [:rhs, :rcol, :lhs, :lcol, :tag]
+  end
+  bloom do
+    rlin <= (t_rules * t_lineage).pairs(:rule_id => :rule_id, :bud_obj => :bud_obj) do |r, l|
+      [l.src_tab, l.src_col, r.lhs.to_sym, l.target_col, l.func]
+    end
+  end
+end
+
+
+module LineageTestM
+  state do
+    scratch :t1, [:a, :b, :c]
+    scratch :t2, [:d, :e, :f]
+    scratch :t3, [:g, :h, :i]
+    scratch :t4, t3.schema
+    scratch :t5, t3.schema
+    scratch :t6, t1.schema
+    scratch :t7, t3.schema
+    scratch :t8, t3.schema
+  end
+  
+  bloom do
+    t2 <= t1
+    t3 <= (t2 * t1).pairs{|t, w| t if true}
+    t4 <= t3{|t| [t[0], t[1], false]}
+    t7 <= (t5 * t6).lefts(:g => :a)
+    t8 <= t5.notin(t6, :g => :a)
+  end
+end
+
+
+class TestLineage
+  include Bud
+  include LHelper
+  include LineageTestM
+end
+
+class TestNestedLineage
+  include Bud
+  include LHelper
+  import LineageTestM => :tm
+  
+  state do
+    scratch :nt1, [:x, :yy, :z]
+    scratch :ont1, nt1.schema
+  end
+  
+  bloom do
+    tm.t1 <= nt1
+    ont1 <= tm.t8
   end
 end
 
@@ -374,5 +431,48 @@ class TestThetaMeta < MiniTest::Unit::TestCase
       next if VizUtil.ma_tables.keys.include? dep.lhs.to_sym
       assert(!dep.nm, "this dependency shouldn't be marked nonmonotonic: #{dep.inspect}")
     end
+  end
+end
+
+class TestLineageMeta < Minitest::Unit::TestCase
+
+  def test_lineage
+    p = TestLineage.new
+    p.tick
+    #p.rlin.each do |l|
+    #  puts "RLIN #{l}" 
+    #end
+    expected = Set.new([
+      [:t3, :h, :t4, :h, nil],
+      [:t3, :g, :t4, :g, nil],
+      [:t2, :d, :t3, :g, nil],
+      [:t2, :e, :t3, :h, nil],
+      [:t1, :c, :t2, :f, nil],
+      [:t5, :g, :t7, :g, nil],
+      [:t5, :h, :t7, :h, nil],
+      [:t6, :a, :t7, :g, :qual],
+      [:t5, :h, :t8, :h, nil],
+      [:t5, :g, :t8, :g, nil],
+      #[:t6, :a, :t8, :g, :qual]
+    ])
+    s = Set.new(p.rlin.map{|l| l.to_a})
+    #assert((expected.subset? s), "subset mismatch #{expected.inspect} and #{s.inspect}")
+
+    pp s
+    unless expected.subset? s
+      expected.each do |e|
+        assert((s.include? e), "#{e} not included in lineage")
+      end
+    end
+    
+  end
+
+  def test_nested_lineage
+    p = TestNestedLineage.new
+    p.tick
+  
+    #p.rlin.each{|l| puts "RLIN #{l}"}
+    #p.t_lineage.each{|l| puts "TLIN #{l}"}
+    #p.t_rules.each{|l| puts "RUL #{l}"}
   end
 end

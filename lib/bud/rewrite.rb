@@ -1,7 +1,8 @@
 require 'rubygems'
+require 'bud/lineage'
 
 class RuleRewriter < Ruby2Ruby # :nodoc: all
-  attr_accessor :rule_indx, :rules, :depends
+  attr_accessor :rule_indx, :rules, :depends, :lineage
 
   OP_LIST = [:<<, :<, :<=].to_set
   TEMP_OP_LIST = [:-@, :~, :+@].to_set
@@ -20,6 +21,7 @@ class RuleRewriter < Ruby2Ruby # :nodoc: all
     @rules = []
     @depends = []
     @iter_stack = []
+    @lineage = []
     @refs_in_body = Set.new
     super()
   end
@@ -262,6 +264,11 @@ class RuleRewriter < Ruby2Ruby # :nodoc: all
     rhs_ast = LatticeRefRewriter.new(@bud_instance).process(rhs_ast)
     ufr = UnsafeFuncRewriter.new(@bud_instance)
     rhs_ast = ufr.process(rhs_ast)
+
+    l = Lineage.new(@bud_instance, lhs, @rule_indx)
+    l.startup(rhs_ast)
+    l.records{|rec| @lineage << rec}
+
 
     if @bud_instance.options[:no_attr_rewrite]
       rhs = collect_rhs(rhs_ast)

@@ -290,6 +290,12 @@ module Bud
         qname = "#{local_name}.#{p.pername}"
         @periodics << [qname.to_sym, p.period]
       end
+      mod_inst.t_lineage.each do |imp_lin|
+        qlsrc = "#{local_name}.#{imp_lin.src_tab}"
+        self.t_lineage << [imp_lin.bud_obj, imp_lin.rule_id, imp_lin.target_col,
+                          qlsrc, imp_lin.src_col, imp_lin.func]
+      end
+
     end
 
     nil
@@ -1206,6 +1212,7 @@ module Bud
     table :t_table_info, [:tab_name, :tab_type]
     table :t_table_schema, [:tab_name, :col_name, :ord, :loc]
     table :t_underspecified, t_provides.schema
+    table :t_lineage, [:bud_obj, :rule_id, :target_col, :src_tab, :src_col, :func]
 
     # Identify builtin tables as such
     @builtin_tables = @tables.clone if toplevel

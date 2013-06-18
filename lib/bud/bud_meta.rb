@@ -64,6 +64,7 @@ class BudMeta #:nodoc: all
     rulebag.each_value do |v|
       v.rules.each {|r| @bud_instance.t_rules << r}
       v.depends.each {|d| @bud_instance.t_depends << d}
+      v.lineage.each{|l| @bud_instance.t_lineage << l}
     end
   end
 
